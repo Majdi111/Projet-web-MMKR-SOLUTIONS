@@ -5,7 +5,7 @@ import type { ElementType } from "react";
 import Image from "next/image";
 import { motion, animate } from "framer-motion";
 import { hoverCard, hoverTransition } from "@/lib/motion";
-import { Plus, Edit, Trash2, Eye, Package, DollarSign, TrendingUp, TrendingDown, Filter, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, Package, DollarSign, TrendingUp, TrendingDown, Filter, Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -583,7 +583,8 @@ export default function ProductsPage() {
             {/* Search */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm">Find:</span>
+                <Search size={18} className="text-muted-foreground" />
+                <span className="font-semibold text-sm">Find :</span>
               </div>
               <div className="w-full sm:max-w-sm">
                 <Input
@@ -598,7 +599,7 @@ export default function ProductsPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex items-center gap-2">
                 <Filter size={18} className="text-muted-foreground" />
-                <span className="font-semibold text-sm">Status:</span>
+                <span className="font-semibold text-sm">Filter :</span>
               </div>
               <div className="flex gap-2 flex-wrap">
                 {statusOptions.map((status) => (
@@ -611,10 +612,7 @@ export default function ProductsPage() {
                   >
                     {status}
                     <Badge variant="secondary" className="ml-2 px-1.5 py-0">
-                      {status === "All" 
-                        ? products.length 
-                        : products.filter(p => p.status === status).length
-                      }
+                      {status === "All" ? products.length : products.filter((p) => p.status === status).length}
                     </Badge>
                   </Button>
                 ))}
@@ -631,8 +629,8 @@ export default function ProductsPage() {
                 <div className="text-sm text-muted-foreground">
                   Showing <span className="font-semibold text-foreground">{filteredProducts.length}</span> of <span className="font-semibold text-foreground">{products.length}</span> products
                 </div>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => {
                     setStatusFilter("All");

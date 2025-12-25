@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Save, Download, ArrowLeft, Plus, Trash2, User, Mail, MapPin, Phone, Calendar, FileText, CheckCircle, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useRouter } from 'next/navigation';
 import { hoverCard, hoverTransition } from '@/lib/motion';
+import { generateInvoicePDF } from '@/app/utils/generateInvoice';
 
 interface InvoiceItem {
   description: string;
@@ -31,11 +32,52 @@ interface InvoiceFormData {
   items: InvoiceItem[];
 }
 
+type CompanyProfile = {
+  name?: string;
+  email?: string;
+  phoneNumbers?: string[];
+  addresses?: string[];
+};
+
 const TAX_RATE = 0.0752; // 7.52%
+const COMPANY_PROFILE_KEY = 'companyProfile';
+
+function readCompanyProfileFromStorage(): CompanyProfile | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(COMPANY_PROFILE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed as CompanyProfile;
+  } catch {
+    return null;
+  }
+}
+
+function subscribeToCompanyProfile(onStoreChange: () => void) {
+  if (typeof window === 'undefined') return () => {};
+
+  const handler = () => onStoreChange();
+  window.addEventListener('storage', handler);
+  window.addEventListener('focus', handler);
+  document.addEventListener('visibilitychange', handler);
+
+  return () => {
+    window.removeEventListener('storage', handler);
+    window.removeEventListener('focus', handler);
+    document.removeEventListener('visibilitychange', handler);
+  };
+}
 
 export default function FormPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const companyProfile = useSyncExternalStore(
+    subscribeToCompanyProfile,
+    readCompanyProfileFromStorage,
+    () => null
+  );
 
   const [formData, setFormData] = useState<InvoiceFormData>({
     client: '',
@@ -106,21 +148,43 @@ export default function FormPage() {
 
   const handleDownload = async () => {
     if (!isFormValid()) return;
-    
-    const total = calculateTotal();
-    const invoice = {
-      id: `INV-${Date.now()}`,
-      client: formData.client,
-      issue: formData.issueDate,
-      due: formData.dueDate,
-      amount: total.toFixed(2),
-      status: formData.status,
-      items: formData.items,
-      notes: formData.notes
-    };
 
-    console.log('Downloading invoice:', invoice);
-    alert('PDF download feature - connect to generateInvoicePdf');
+    const subtotal = calculateSubtotal();
+    const taxAmount = calculateTax();
+    const totalAmount = calculateTotal();
+
+    await generateInvoicePDF(
+      {
+        invoiceNumber: `INV-${Date.now()}`,
+        issueDate: formData.issueDate ? new Date(formData.issueDate) : new Date(),
+        dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
+        status: formData.status,
+        client: {
+          name: formData.client,
+          email: formData.clientEmail || undefined,
+          phone: formData.clientPhone || undefined,
+          location: formData.clientAddress || undefined,
+        },
+        items: formData.items.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          totalPrice: item.quantity * item.price,
+        })),
+        subtotal,
+        taxAmount,
+        totalAmount,
+        notes: undefined,
+      },
+      {
+        company: {
+          name: companyProfile?.name,
+          email: companyProfile?.email,
+          phoneNumbers: companyProfile?.phoneNumbers,
+          addresses: companyProfile?.addresses,
+        },
+      }
+    );
   };
 
   return (
@@ -155,24 +219,39 @@ export default function FormPage() {
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={handleDownload}
-              disabled={!isFormValid()}
-              className="flex items-center gap-2 hover:scale-[1.02] transition-transform duration-300 ease-out"
-            >
-              <Download className="h-4 w-4" />
-              Download PDF
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={isSubmitting || !isFormValid()}
-              className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:scale-[1.02] transition-transform duration-300 ease-out shadow-lg disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {isSubmitting ? 'Saving...' : 'Save Invoice'}
-            </Button>
+          <div className="flex flex-col items-start sm:items-end gap-3">
+            {(companyProfile?.name || companyProfile?.email || (companyProfile?.phoneNumbers?.length ?? 0) > 0 || (companyProfile?.addresses?.length ?? 0) > 0) && (
+              <div className="text-right text-sm" dir="ltr">
+                <div className="font-semibold text-foreground">{companyProfile?.name}</div>
+                {companyProfile?.email && <div className="text-muted-foreground">{companyProfile.email}</div>}
+                {(companyProfile?.phoneNumbers?.length ?? 0) > 0 && (
+                  <div className="text-muted-foreground">{companyProfile?.phoneNumbers?.filter(Boolean).join(' / ')}</div>
+                )}
+                {(companyProfile?.addresses?.length ?? 0) > 0 && (
+                  <div className="text-muted-foreground">{companyProfile?.addresses?.filter(Boolean).join(' · ')}</div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={handleDownload}
+                disabled={!isFormValid()}
+                className="flex items-center gap-2 hover:scale-[1.02] transition-transform duration-300 ease-out"
+              >
+                <Download className="h-4 w-4" />
+                Download PDF
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={isSubmitting || !isFormValid()}
+                className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:scale-[1.02] transition-transform duration-300 ease-out shadow-lg disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {isSubmitting ? 'Saving...' : 'Save Invoice'}
+              </Button>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -429,7 +508,7 @@ export default function FormPage() {
                         <div className="md:col-span-2 space-y-2">
                           <Label className="text-sm">Total</Label>
                           <div className="h-10 flex items-center px-3 bg-primary/10 border border-primary/20 rounded-md font-bold text-primary">
-                            ${(item.quantity * item.price).toFixed(2)}
+                            {(item.quantity * item.price).toFixed(2)} Dt
                           </div>
                         </div>
                       </div>
@@ -495,12 +574,12 @@ export default function FormPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal:</span>
-                    <span className="font-semibold">${calculateSubtotal().toFixed(2)}</span>
+                    <span className="font-semibold">{calculateSubtotal().toFixed(2)} Dt</span>
                   </div>
 
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Tax (7.52%):</span>
-                    <span className="font-semibold">${calculateTax().toFixed(2)}</span>
+                    <span className="font-semibold">{calculateTax().toFixed(2)} Dt</span>
                   </div>
 
                   <Separator />
@@ -514,7 +593,7 @@ export default function FormPage() {
                       animate={{ scale: 1 }}
                       transition={{ duration: 0.3 }}
                     >
-                      ${calculateTotal().toFixed(2)}
+                      {calculateTotal().toFixed(2)} Dt
                     </motion.span>
                   </div>
                 </div>

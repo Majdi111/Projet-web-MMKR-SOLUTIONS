@@ -27,6 +27,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AddClientDialog from '@/app/clients/add-client-form/AddClientDialog';
@@ -47,6 +49,7 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
+import { generateInvoicePDF } from "@/app/utils/generateInvoice";
 
 
 interface Client {
@@ -131,113 +134,6 @@ const calculateInvoiceTotals = (
   };
 };
 
-//  PDF GENERATION
-const generateInvoicePDF = async (invoice: Invoice) => {
-  if (typeof window === "undefined") return;
-
-  try {
-    const { jsPDF } = await import("jspdf");
-    const doc = new jsPDF();
-
-    // Header
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', 105, 20, { align: 'center' });
-    
-    // Invoice Details
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Invoice #: ${invoice.invoiceNumber}`, 20, 40);
-    doc.text(`Issue Date: ${invoice.issueDate.toLocaleDateString()}`, 20, 46);
-    doc.text(`Due Date: ${invoice.dueDate.toLocaleDateString()}`, 20, 52);
-    doc.text(`Status: ${invoice.status}`, 20, 58);
-    
-    // Client Info
-    doc.setFont('helvetica', 'bold');
-    doc.text('Bill To:', 20, 75);
-    doc.setFont('helvetica', 'normal');
-    doc.text(invoice.client.name, 20, 81);
-    doc.text(`CIN: ${invoice.clientCIN}`, 20, 87);
-    if (invoice.client.email) doc.text(invoice.client.email, 20, 93);
-    if (invoice.client.phone) doc.text(invoice.client.phone, 20, 99);
-    if (invoice.client.location) doc.text(invoice.client.location, 20, 105);
-    
-    // Table Header
-    const startY = 125;
-    doc.setFillColor(59, 130, 246);
-    doc.rect(20, startY, 170, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Description', 22, startY + 5.5);
-    doc.text('Qty', 120, startY + 5.5);
-    doc.text('Price', 140, startY + 5.5);
-    doc.text('Total', 170, startY + 5.5);
-    
-    // ✅ SAFE ITEMS LOOP
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
-    let currentY = startY + 15;
-    
-    invoice.items.forEach((item, index) => {
-      if (currentY > 260) {
-        doc.addPage();
-        currentY = 20;
-      }
-      
-      const description = String(item.description || "No description").substring(0, 50);
-      const qty = String(item.quantity || 0);
-      const unitPrice = `$${Number(item.unitPrice || 0).toFixed(2)}`;
-      const totalPrice = `$${Number(item.totalPrice || 0).toFixed(2)}`;
-      
-      doc.text(description, 22, currentY);
-      doc.text(qty, 120, currentY);
-      doc.text(unitPrice, 140, currentY);
-      doc.text(totalPrice, 170, currentY);
-      currentY += 8;
-      
-      if (index < invoice.items.length - 1) {
-        doc.setDrawColor(200, 200, 200);
-        doc.line(20, currentY - 3, 190, currentY - 3);
-      }
-    });
-    
-    // Totals
-    currentY += 10;
-    doc.setFont('helvetica', 'normal');
-    doc.text('Subtotal:', 140, currentY);
-    doc.text(`$${invoice.subtotal.toFixed(2)}`, 170, currentY);
-    
-    currentY += 7;
-    const displayTaxRate = invoice.taxRate > 1 ? invoice.taxRate : invoice.taxRate * 100;
-    doc.text(`Tax (${displayTaxRate.toFixed(2)}%):`, 140, currentY);
-    doc.text(`$${invoice.taxAmount.toFixed(2)}`, 170, currentY);
-    
-    currentY += 10;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Total:', 140, currentY);
-    doc.text(`$${invoice.totalAmount.toFixed(2)}`, 170, currentY);
-    
-    if (invoice.notes) {
-      currentY += 20;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Notes:', 20, currentY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(invoice.notes, 20, currentY + 6, { maxWidth: 170 });
-    }
-    
-    doc.setFontSize(8);
-    doc.setTextColor(128, 128, 128);
-    doc.text('Thank you for your business!', 105, 280, { align: 'center' });
-    
-    doc.save(`${invoice.invoiceNumber}.pdf`);
-  } catch (error) {
-    console.error('PDF Error:', error);
-    alert('PDF failed. Check console.');
-  }
-};
-
 const generateInvoiceNumber = () => {
   const timestamp = Date.now().toString().slice(-8);
   const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
@@ -250,6 +146,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Inactive" | "PendingOrders">("All");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientOrders, setClientOrders] = useState<Order[]>([]);
@@ -287,7 +184,7 @@ export default function ClientsPage() {
       setDeleteDialogState({ isOpen: false, clientId: "", clientName: "" });
       setNotification({
         type: "success",
-        message: `✅ Client "${deleteDialogState.clientName}" deleted successfully`
+        message: `Client "${deleteDialogState.clientName}" deleted successfully.`
       });
       setTimeout(() => setNotification(null), 5000);
     } catch (err) {
@@ -295,7 +192,7 @@ export default function ClientsPage() {
       const errorMessage = err instanceof Error ? err.message : "Failed to delete client";
       setNotification({
         type: "error",
-        message: `❌ ${errorMessage}`
+        message: String(errorMessage)
       });
       setTimeout(() => setNotification(null), 5000);
     } finally {
@@ -473,6 +370,14 @@ export default function ClientsPage() {
       : statusFilter === "PendingOrders"
         ? clients.filter(c => (c.pendingOrdersCount || 0) > 0)
         : clients.filter(c => c.status === statusFilter);
+
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length > 0) {
+      result = result.filter((c) => {
+        const haystack = `${c.name} ${c.cin} ${c.email} ${c.phone} ${c.location}`.toLowerCase();
+        return haystack.includes(q);
+      });
+    }
     
     // Sort so clients with pending orders appear at the bottom
     return result.sort((a, b) => {
@@ -577,15 +482,15 @@ export default function ClientsPage() {
                   <div className="text-sm space-y-2 mb-4">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <span className="font-medium">${order.subtotal.toFixed(2)}</span>
+                      <span className="font-medium">{order.subtotal.toFixed(2)} Dt</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Tax {(order.taxRate * 100).toFixed(1)}%:</span>
-                      <span className="font-medium">${order.taxAmount.toFixed(2)}</span>
+                      <span className="font-medium">{order.taxAmount.toFixed(2)} Dt</span>
                     </div>
                     <div className="flex justify-between text-lg font-bold border-t pt-2">
                       <span>Total:</span>
-                      <span className="text-primary">${order.totalAmount.toFixed(2)}</span>
+                      <span className="text-primary">{order.totalAmount.toFixed(2)} Dt</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {order.createdAt.toLocaleDateString()}
@@ -614,7 +519,7 @@ export default function ClientsPage() {
                         ) : (
                           <>
                             <FileText size={16} className="mr-2" />
-                            Traiter
+                            Process
                           </>
                         )}
                       </Button>
@@ -662,11 +567,11 @@ export default function ClientsPage() {
                       <div key={i} className="p-4 border rounded-lg bg-muted/30">
                         <div className="flex justify-between items-start mb-2">
                           <p className="font-semibold">{item.description}</p>
-                          <p className="font-bold text-primary">${item.totalPrice.toFixed(2)}</p>
+                          <p className="font-bold text-primary">{item.totalPrice.toFixed(2)} Dt</p>
                         </div>
                         <div className="flex gap-4 text-sm text-muted-foreground">
                           <span>Qty: {item.quantity}</span>
-                          <span>Unit: ${item.unitPrice.toFixed(2)}</span>
+                          <span>Unit: {item.unitPrice.toFixed(2)} Dt</span>
                         </div>
                       </div>
                     ))}
@@ -676,15 +581,15 @@ export default function ClientsPage() {
                 <div className="border-t pt-4 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
-                    <span>${selectedOrder.subtotal.toFixed(2)}</span>
+                    <span>{selectedOrder.subtotal.toFixed(2)} Dt</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Tax ({(selectedOrder.taxRate * 100).toFixed(1)}%):</span>
-                    <span>${selectedOrder.taxAmount.toFixed(2)}</span>
+                    <span>{selectedOrder.taxAmount.toFixed(2)} Dt</span>
                   </div>
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total:</span>
-                    <span className="text-primary">${selectedOrder.totalAmount.toFixed(2)}</span>
+                    <span className="text-primary">{selectedOrder.totalAmount.toFixed(2)} Dt</span>
                   </div>
                 </div>
               </div>
@@ -704,18 +609,22 @@ export default function ClientsPage() {
           initial={{ opacity: 0, y: -20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
-          className={`fixed top-4 left-1/2 -translate-x-1/2 max-w-md z-50 p-4 rounded-lg border shadow-lg ${
-            notification.type === "success"
-              ? "bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400"
-              : "bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-400"
-          }`}
+          className="fixed top-4 left-1/2 -translate-x-1/2 max-w-md z-50 w-[calc(100vw-2rem)] sm:w-auto"
         >
-          <div className="flex items-center gap-3">
-            <div className={`text-xl ${notification.type === "success" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-              {notification.type === "success" ? "✓" : "⚠"}
-            </div>
-            <p className="font-medium">{notification.message}</p>
-          </div>
+          <Alert
+            variant={notification.type === "error" ? "destructive" : "default"}
+            className="shadow-xl"
+          >
+            {notification.type === "success" ? (
+              <BadgeCheck className="text-primary" />
+            ) : (
+              <CircleAlert className="text-destructive" />
+            )}
+            <AlertTitle>{notification.type === "success" ? "Success" : "Error"}</AlertTitle>
+            <AlertDescription>
+              <p className="font-medium text-foreground">{notification.message}</p>
+            </AlertDescription>
+          </Alert>
         </motion.div>
       )}
 
@@ -750,32 +659,84 @@ export default function ClientsPage() {
         </div>
       </motion.div>
 
-      {/* ✅ UPDATED: Added Pending Orders filter */}
-      <Card className="p-4 mb-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Filter size={18} />
-            <span className="font-semibold">Filter:</span>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {(["All", "Active", "Inactive", "PendingOrders"] as const).map(status => (
-              <Button
-                key={status}
-                variant={statusFilter === status ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter(status)}
+      {/* Filter Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="mb-6"
+      >
+        <Card className="p-4">
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Search size={18} className="text-muted-foreground" />
+                <span className="font-semibold text-sm">Find :</span>
+              </div>
+              <div className="w-full sm:max-w-sm">
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by client name"
+                />
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter size={18} className="text-muted-foreground" />
+                <span className="font-semibold text-sm">Filter :</span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {(["All", "Active", "Inactive", "PendingOrders"] as const).map((status) => (
+                  <Button
+                    key={status}
+                    variant={statusFilter === status ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setStatusFilter(status)}
+                    className="transition-all duration-300"
+                  >
+                    {status === "PendingOrders" ? "Pending Orders" : status}
+                    <Badge variant="secondary" className="ml-2 px-1.5 py-0">
+                      {status === "All"
+                        ? clients.length
+                        : status === "PendingOrders"
+                          ? clients.filter((c) => (c.pendingOrdersCount || 0) > 0).length
+                          : clients.filter((c) => c.status === status).length}
+                    </Badge>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Results Summary */}
+            {(statusFilter !== "All" || searchQuery.trim().length > 0) && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-2 pt-2"
               >
-                {status === "PendingOrders" ? "Pending Orders" : status}
-                <Badge variant="secondary" className="ml-2 px-2 py-0">
-                  {status === "All" ? clients.length :
-                   status === "PendingOrders" ? clients.filter(c => (c.pendingOrdersCount || 0) > 0).length :
-                   clients.filter(c => c.status === status).length}
-                </Badge>
-              </Button>
-            ))}
+                <div className="text-sm text-muted-foreground">
+                  Showing <span className="font-semibold text-foreground">{filteredClients.length}</span> of <span className="font-semibold text-foreground">{clients.length}</span> clients
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setStatusFilter("All");
+                    setSearchQuery("");
+                  }}
+                  className="h-7 text-xs"
+                >
+                  Clear Filters
+                </Button>
+              </motion.div>
+            )}
           </div>
-        </div>
-      </Card>
+        </Card>
+      </motion.div>
 
       {loading ? (
         <motion.div

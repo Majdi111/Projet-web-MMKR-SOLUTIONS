@@ -41,7 +41,7 @@ export default function Sidebar({
 
   const bottomMenu = [
     { name: "Settings", icon: Settings, path: "/settings", desc: "App Settings" },
-    { name: "Help", icon: HelpCircle, path: "/help", desc: "Get Support" },
+    { name: "Help", icon: HelpCircle, path: "#help", desc: "Get Support" },
   ];
 
   const handleLogout = async () => {
@@ -107,21 +107,28 @@ export default function Sidebar({
             transition={{ delay: 0.1 }}
             className="mb-8 flex w-full justify-center"
           >
-            <motion.div
-              whileHover={{ scale: 1.03, y: -1 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 320, damping: 22 }}
-              className="relative"
+            <Link
+              href="/dashboard"
+              aria-label="Go to dashboard"
+              onClick={() => window.innerWidth < 1024 && setIsCollapsed(true)}
+              className="block"
             >
-              <Image
-                src="/logo.png"
-                alt="Company Logo"
-                width={155}
-                height={44}
-                className="rounded-xl object-contain"
-                priority
-              />
-            </motion.div>
+              <motion.div
+                whileHover={{ scale: 1.03, y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ type: "spring", stiffness: 320, damping: 22 }}
+                className="relative cursor-pointer"
+              >
+                <Image
+                  src="/logo.png"
+                  alt="Company Logo"
+                  width={155}
+                  height={44}
+                  className="rounded-xl object-contain"
+                  priority
+                />
+              </motion.div>
+            </Link>
           </motion.div>
 
           {/* Navigation */}

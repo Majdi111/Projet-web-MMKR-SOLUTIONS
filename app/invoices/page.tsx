@@ -36,6 +36,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { collection, getDocs, query, orderBy, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
+import { generateInvoicePDF } from "@/app/utils/generateInvoice";
 
 interface OrderItem {
   id: string;
@@ -69,94 +70,6 @@ interface Invoice {
   createdAt: Date;
   updatedAt: Date;
 }
-
-const generateInvoicePDF = async (invoice: Invoice) => {
-  const { jsPDF } = await import('jspdf');
-  const doc = new jsPDF();
-  
-  doc.setFontSize(24);
-  doc.setFont('helvetica', 'bold');
-  doc.text('INVOICE', 105, 20, { align: 'center' });
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Invoice #: ${invoice.invoiceNumber}`, 20, 40);
-  doc.text(`Issue Date: ${invoice.issueDate.toLocaleDateString()}`, 20, 46);
-  doc.text(`Due Date: ${invoice.dueDate.toLocaleDateString()}`, 20, 52);
-  doc.text(`Status: ${invoice.status}`, 20, 58);
-  
-  doc.setFont('helvetica', 'bold');
-  doc.text('Bill To:', 20, 75);
-  doc.setFont('helvetica', 'normal');
-  doc.text(invoice.client.name, 20, 81);
-  doc.text(`CIN: ${invoice.clientCIN}`, 20, 87);
-  if (invoice.client.email) doc.text(invoice.client.email, 20, 93);
-  if (invoice.client.phone) doc.text(invoice.client.phone, 20, 99);
-  if (invoice.client.location) doc.text(invoice.client.location, 20, 105);
-  
-  const startY = 125;
-  doc.setFillColor(59, 130, 246);
-  doc.rect(20, startY, 170, 8, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Description', 22, startY + 5.5);
-  doc.text('Qty', 120, startY + 5.5);
-  doc.text('Price', 140, startY + 5.5);
-  doc.text('Total', 170, startY + 5.5);
-  
-  doc.setTextColor(0, 0, 0);
-  doc.setFont('helvetica', 'normal');
-  let currentY = startY + 15;
-  
-  invoice.items.forEach((item, index) => {
-    if (currentY > 260) {
-      doc.addPage();
-      currentY = 20;
-    }
-    const description = String(item.description || "No description").substring(0, 50);
-    doc.text(description, 22, currentY);
-    doc.text(String(item.quantity || 0), 120, currentY);
-    doc.text(`$${Number(item.unitPrice || 0).toFixed(2)}`, 140, currentY);
-    doc.text(`$${Number(item.totalPrice || 0).toFixed(2)}`, 170, currentY);
-    currentY += 8;
-    
-    if (index < invoice.items.length - 1) {
-      doc.setDrawColor(200, 200, 200);
-      doc.line(20, currentY - 3, 190, currentY - 3);
-    }
-  });
-  
-  currentY += 10;
-  doc.setFont('helvetica', 'normal');
-  doc.text('Subtotal:', 140, currentY);
-  doc.text(`$${invoice.subtotal.toFixed(2)}`, 170, currentY);
-  
-  currentY += 7;
-  const displayTaxRate = invoice.taxRate > 1 ? invoice.taxRate : invoice.taxRate * 100;
-  doc.text(`Tax (${displayTaxRate.toFixed(2)}%):`, 140, currentY);
-  doc.text(`$${invoice.taxAmount.toFixed(2)}`, 170, currentY);
-  
-  currentY += 10;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text('Total:', 140, currentY);
-  doc.text(`$${invoice.totalAmount.toFixed(2)}`, 170, currentY);
-  
-  if (invoice.notes) {
-    currentY += 20;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Notes:', 20, currentY);
-    doc.setFont('helvetica', 'normal');
-    doc.text(invoice.notes, 20, currentY + 6, { maxWidth: 170 });
-  }
-  
-  doc.setFontSize(8);
-  doc.setTextColor(128, 128, 128);
-  doc.text('Thank you for your business!', 105, 280, { align: 'center' });
-  
-  doc.save(`${invoice.invoiceNumber}.pdf`);
-};
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -343,11 +256,6 @@ export default function InvoicesPage() {
           >
             {viewMode === "grid" ? "Table View" : "Grid View"}
           </Button>
-          <Button 
-            className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:scale-[1.02] transition-transform duration-300 ease-out shadow-lg"
-          >
-            <Plus size={16} /> New Invoice
-          </Button>
         </div>
       </motion.div>
 
@@ -370,7 +278,7 @@ export default function InvoicesPage() {
           },
           {
             title: "Total Revenue",
-            value: `$${totalRevenue.toFixed(2)}`,
+            value: `${totalRevenue.toFixed(2)} Dt`,
             description: "Total payments received",
             icon: DollarSign,
             color: "text-purple-600",
@@ -397,67 +305,80 @@ export default function InvoicesPage() {
         ))}
       </div>
 
-  {/*  Filters LEFT + Search RIGHT */}
-<motion.div
-  initial={{ opacity: 0, y: 10 }}
-  animate={{ opacity: 1, y: 0 }}
-  className="mb-6"
->
-  <Card className="p-6">
-    <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
-      {/* LEFT: Filter Label + Buttons - SAME ORDER */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Filter size={18} className="text-muted-foreground" />
-          <span className="font-semibold text-sm">Filter by Status:</span>
-        </div>
-        <div className="flex gap-2 flex-wrap order-1">
-          {["All", "Paid", "Pending", "Overdue"].map((status) => (
-            <Button
-              key={status}
-              variant={statusFilter === status ? "default" : "outline"}
-              size="sm"
-              onClick={() => setStatusFilter(status as typeof statusFilter)}
-            >
-              {status}
-              <Badge variant="secondary" className="ml-2 px-1.5 py-0 h-5">
-                {status === "All" 
-                  ? filteredInvoices.length 
-                  : invoices.filter(i => i.status === status).filter(i => 
-                      i.clientCIN.toLowerCase().includes(cinSearch.toLowerCase())
-                    ).length
-                }
-              </Badge>
-            </Button>
-          ))}
-        </div>
-      </div>
+      {/* Filter Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="mb-6"
+      >
+        <Card className="p-4">
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Search size={18} className="text-muted-foreground" />
+                <span className="font-semibold text-sm">Find :</span>
+              </div>
+              <div className="w-full sm:max-w-sm">
+                <Input
+                  value={cinSearch}
+                  onChange={(e) => setCinSearch(e.target.value)}
+                  placeholder="Search by CIN"
+                />
+              </div>
+            </div>
 
-      {/* RIGHT: Search Bar */}
-      <div className="relative flex-1 max-w-md order-last">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by CIN..."
-          value={cinSearch}
-          onChange={(e) => setCinSearch(e.target.value)}
-          className="pl-10 w-full"
-        />
-      </div>
-    </div>
-    
-    {/* Results count */}
-    {filteredInvoices.length !== invoices.length && (
-      <p className="text-sm text-muted-foreground mt-3">
-        Showing {filteredInvoices.length} of {invoices.length} invoices
-        {cinSearch && (
-          <>
-            {' '}• Found {filteredInvoices.length} matching CIN: <strong>{cinSearch}</strong>
-          </>
-        )}
-      </p>
-    )}
-  </Card>
-</motion.div>
+            {/* Status Filter */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter size={18} className="text-muted-foreground" />
+                <span className="font-semibold text-sm">Filter :</span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {(["All", "Paid", "Pending", "Overdue"] as const).map((status) => (
+                  <Button
+                    key={status}
+                    variant={statusFilter === status ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setStatusFilter(status)}
+                    className="transition-all duration-300"
+                  >
+                    {status}
+                    <Badge variant="secondary" className="ml-2 px-1.5 py-0">
+                      {status === "All" ? invoices.length : invoices.filter((i) => i.status === status).length}
+                    </Badge>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Results Summary */}
+            {(statusFilter !== "All" || cinSearch.trim().length > 0) && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-2 pt-2"
+              >
+                <div className="text-sm text-muted-foreground">
+                  Showing <span className="font-semibold text-foreground">{filteredInvoices.length}</span> of <span className="font-semibold text-foreground">{invoices.length}</span> invoices
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setStatusFilter("All");
+                    setCinSearch("");
+                  }}
+                  className="h-7 text-xs"
+                >
+                  Clear Filters
+                </Button>
+              </motion.div>
+            )}
+          </div>
+        </Card>
+      </motion.div>
 
 
       {/* Grid View */}
@@ -532,7 +453,7 @@ export default function InvoicesPage() {
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Amount</p>
                     <p className="text-2xl font-bold text-primary">
-                      ${inv.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {inv.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Dt
                     </p>
                   </div>
                   
@@ -646,7 +567,7 @@ export default function InvoicesPage() {
                         </div>
                       </td>
                       <td className="px-6 py-5 text-right font-bold text-primary">
-                        ${inv.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {inv.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} Dt
                       </td>
                       <td className="px-6 py-5">
                         <div className="flex items-center justify-center gap-1">
@@ -751,10 +672,6 @@ export default function InvoicesPage() {
                   Clear Search
                 </Button>
               )}
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Invoice
-              </Button>
             </div>
           </Card>
         </motion.div>

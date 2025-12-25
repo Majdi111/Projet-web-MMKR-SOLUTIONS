@@ -23,6 +23,7 @@ interface Client {
 
 interface Product {
   id: string;
+  reference?: string;
   name: string;
   price: number;
   stock: number;
@@ -30,6 +31,7 @@ interface Product {
 
 interface OrderItem {
   productId: string;
+  reference?: string;
   description: string;
   quantity: number;
   unitPrice: number;
@@ -83,6 +85,7 @@ export default function TestPage() {
         setProducts(
           productsSnapshot.docs.map(doc => ({
             id: doc.id,
+            reference: doc.data().reference,
             name: doc.data().name,
             price: doc.data().price || 0,
             stock: doc.data().stock || 0,
@@ -117,6 +120,7 @@ export default function TestPage() {
       newItems[index] = {
         ...newItems[index],
         productId: value,
+        reference: product?.reference || product?.id || "",
         description: product?.name || "",
         unitPrice: product?.price || 0,
         totalPrice: (product?.price || 0) * newItems[index].quantity,

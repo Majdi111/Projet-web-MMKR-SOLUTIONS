@@ -29,6 +29,8 @@ export interface Order {
 
 export interface OrderItem {
   id: string;
+  productId?: string;
+  reference?: string;
   description: string; // Changed from 'name' to match your form
   quantity: number;
   unitPrice: number;

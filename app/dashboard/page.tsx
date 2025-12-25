@@ -50,7 +50,7 @@ const COLORS = ["#3c3cecff", "#fbbf24", "#c55959ff"]
 const defaultStatsData = [
   { 
     title: "Total Revenue", 
-    value: "$0", 
+    value: "0 Dt", 
     subtitle: "+0% from last month", 
     icon: DollarSign,
     color: "text-green-600",
@@ -103,7 +103,7 @@ function AnimatedCounter({
       ease: "easeOut",
       onUpdate(latest) {
         const formatted = Math.floor(latest).toLocaleString()
-        const displayValue = isMonetary ? `$${formatted}` : formatted
+        const displayValue = isMonetary ? `${formatted} Dt` : formatted
         
         
         if (displayRef.current) {
@@ -502,7 +502,7 @@ export default function DashboardPage() {
         setStatsData([
           { 
             title: "Total Revenue", 
-            value: `$${totalRevenue.toFixed(2)}`, 
+            value: `${totalRevenue.toFixed(2)} Dt`, 
             subtitle: "+12.5% from last month", 
             icon: DollarSign,
             color: "text-green-600",

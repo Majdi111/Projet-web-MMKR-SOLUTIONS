@@ -286,7 +286,7 @@ export default function TopBar({
                   <div className="flex-1">
                     <h4 className="font-semibold text-sm">{order.orderNumber}</h4>
                     <p className="text-xs text-muted-foreground mt-1">Client: {order.clientName}</p>
-                    <p className="text-xs text-muted-foreground">Amount: ${order.totalAmount.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">Amount: {order.totalAmount.toFixed(2)} Dt</p>
                   </div>
                   <motion.div
                     whileHover={{ scale: 1.05 }}
