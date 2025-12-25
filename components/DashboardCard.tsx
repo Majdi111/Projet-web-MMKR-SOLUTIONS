@@ -1,0 +1,40 @@
+/**
+ * @module DashboardCard.tsx
+ * @description Reusable dashboard card component for displaying metrics and statistics with hover animations.
+ */
+
+"use client"
+
+import { motion } from "framer-motion"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { hoverCard, hoverTransition } from "@/lib/motion"
+
+/**
+ * @component DashboardCard
+ * @description Card component that displays a metric with title, value, and optional subtitle.
+ * Features hover animation that scales the card slightly.
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.title - Card title/metric name
+ * @param {string} props.value - Metric value to display
+ * @param {string} [props.subtitle] - Optional subtitle with additional information
+ * @returns {JSX.Element} Rendered dashboard card
+ */
+export default function DashboardCard({ title, value, subtitle }: { title: string, value: string, subtitle?: string }) {
+  return (
+    <motion.div
+      whileHover={hoverCard}
+      transition={hoverTransition}
+    >
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-2xl font-bold">{value}</p>
+          {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
