@@ -120,6 +120,16 @@ export default function LoginForm({ onSwitch }: { onSwitch: (type: AuthFormType)
             </label>
           </motion.div>
         ))}
+        {/* Forgot Password Link */}
+        <div className="text-right">
+          <button
+            type="button"
+            onClick={() => onSwitch("forgot")}
+            className="text-sm text-blue-400 hover:text-blue-300"
+          >
+            Forgot Password?
+          </button>
+        </div>
 
         <button
           type="submit"

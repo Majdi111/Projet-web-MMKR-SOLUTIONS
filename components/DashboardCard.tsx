@@ -10,15 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { hoverCard, hoverTransition } from "@/lib/motion"
 
 /**
- * @component DashboardCard
- * @description Card component that displays a metric with title, value, and optional subtitle.
- * Features hover animation that scales the card slightly.
- * 
- * @param {Object} props - Component props
- * @param {string} props.title - Card title/metric name
- * @param {string} props.value - Metric value to display
- * @param {string} [props.subtitle] - Optional subtitle with additional information
- * @returns {JSX.Element} Rendered dashboard card
+ * DashboardCard Component
+ * Displays a metric card with title, value, and optional subtitle.
+ * Includes hover animation effect.
  */
 export default function DashboardCard({ title, value, subtitle }: { title: string, value: string, subtitle?: string }) {
   return (

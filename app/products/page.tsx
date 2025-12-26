@@ -17,6 +17,7 @@ import AddProductDialog from "./add-product-form/AddProductDialog";
 import EditProductDialog from "./edit-product-form/EditProductDialog";
 import DeleteProductDialog from "./delete-product-dialog/DeleteProductDialog";
 
+// Format price in Tunisian Dinar
 function formatPriceDT(value: number) {
   return `${value}dt`;
 }
@@ -35,7 +36,7 @@ interface Product {
   image: string;
 }
 
-// Animated Counter Component
+// Animated number counter with smooth transitions
 function AnimatedCounter({
   value,
   duration = 2,
@@ -74,6 +75,7 @@ function AnimatedCounter({
   return <span>{displayValue}</span>;
 }
 
+// Product image component with error handling
 function ProductImage({
   product,
   size,
@@ -103,7 +105,7 @@ function ProductImage({
   );
 }
 
-// Stats Card Component
+// Statistics card with animated counter and hover effects
 function StatsCard({ 
   title, 
   value, 
@@ -155,7 +157,7 @@ function StatsCard({
   )
 }
 
-// Product Card Component
+// Individual product card with image, pricing, and action buttons
 function ProductCard({ product, index, onEdit, onDelete }: { product: Product; index: number; onEdit?: (product: Product) => void; onDelete?: (id: string, name: string) => void }) {
   const getStatusVariant = (status: string): "default" | "secondary" | "destructive" => {
     switch(status) {
@@ -285,7 +287,7 @@ function ProductCard({ product, index, onEdit, onDelete }: { product: Product; i
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: 0.05 + index * 0.02 }}
-              className="mb-4 min-h-[80px] flex items-center justify-center"
+              className="mb-4"
             >
               <motion.div
                 whileHover={{ scale: 1.02 }}
@@ -381,8 +383,11 @@ function ProductCard({ product, index, onEdit, onDelete }: { product: Product; i
   );
 }
 
-// Main Products Page Component
+// Main products page with grid/table views and filtering
 export default function ProductsPage() {
+  // ========== STATE MANAGEMENT ==========
+  
+  // All products loaded from Firestore
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -398,7 +403,7 @@ export default function ProductsPage() {
     productName: "",
   });
   
-  // Fetch products from Firebase
+  // Load all products from Firestore
   const fetchProducts = async () => {
     try {
       setLoading(true);
@@ -425,7 +430,7 @@ export default function ProductsPage() {
     fetchProducts();
   }, []);
 
-  // Delete product from Firebase
+  // Open delete confirmation dialog
   const handleDeleteProduct = (productId: string, productName: string) => {
     setDeleteDialogState({
       isOpen: true,
@@ -434,11 +439,13 @@ export default function ProductsPage() {
     });
   };
 
+  // Open edit dialog with selected product
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setIsEditProductDialogOpen(true);
   };
 
+  // Execute product deletion after confirmation
   const confirmDeleteProduct = async () => {
     try {
       await deleteDoc(doc(db, 'products', deleteDialogState.productId));
@@ -450,7 +457,7 @@ export default function ProductsPage() {
     }
   };
 
-  // Show loading state
+  // Display loading spinner while fetching
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -475,7 +482,7 @@ export default function ProductsPage() {
     );
   }
 
-  // Show error state
+  // Display error message if loading fails
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -493,12 +500,15 @@ export default function ProductsPage() {
     );
   }
 
+  // ========== STATISTICS CALCULATIONS ==========
+  
+  // Calculate total products and inventory values
   const totalProducts = products.length;
   const totalValue = products.reduce((sum, p) => sum + ((p.price ?? 0) * p.stock), 0);
   const lowStock = products.filter(p => p.status === "Low Stock" || p.status === "Out of Stock").length;
   const totalSales = products.reduce((sum, p) => sum + p.sales, 0);
 
-  // Apply status filter
+  // Apply filters: status filter and search query
   const filteredProducts = products.filter(product => {
     const matchesStatus = statusFilter === "All" || product.status === statusFilter;
     const q = searchQuery.trim().toLowerCase();
@@ -506,15 +516,18 @@ export default function ProductsPage() {
     return matchesStatus && matchesQuery;
   });
 
+  // Statistics cards data for dashboard overview
   const statsData = [
     { title: "Total Products", value: totalProducts, icon: Package, color: "text-blue-600" },
-    { title: "Total Value", value: formatPriceDT(totalValue), icon: DollarSign, color: "text-green-600" },
+    { title: "Total Value", value: `${totalValue.toFixed(2)}dt`, icon: DollarSign, color: "text-green-600" },
     { title: "Low Stock Alert", value: lowStock, icon: TrendingDown, color: "text-orange-600" },
     { title: "Total Sales", value: totalSales, icon: TrendingUp, color: "text-purple-600" },
   ];
 
   const statusOptions = ["All", "In Stock", "Low Stock", "Out of Stock", "Arriving Soon"] as const;
 
+  // ========== MAIN UI ==========
+  
   return (
     <div className="p-8 max-w-[1600px] mx-auto">
       {/* Header Section */}
@@ -553,7 +566,7 @@ export default function ProductsPage() {
         </div>
       </motion.div>
 
-      {/* Stats Cards */}
+      {/* Statistics Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {statsData.map((stat, index) => (
           <StatsCard 
@@ -567,7 +580,7 @@ export default function ProductsPage() {
         ))}
       </div>
 
-      {/* Filter Section */}
+      {/* Search and Filter Controls */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

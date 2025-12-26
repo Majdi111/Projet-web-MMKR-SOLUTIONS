@@ -12,6 +12,9 @@ import { hoverTransition } from "@/lib/motion";
 import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
 
+// ========== TYPE DEFINITIONS ==========
+
+// Client data structure from Firestore
 interface Client {
   id: string;
   name: string;
@@ -21,6 +24,7 @@ interface Client {
   location: string;
 }
 
+// Product data structure with pricing and inventory
 interface Product {
   id: string;
   reference?: string;
@@ -29,6 +33,7 @@ interface Product {
   stock: number;
 }
 
+// Individual item in an order with calculated totals
 interface OrderItem {
   productId: string;
   reference?: string;
@@ -38,6 +43,7 @@ interface OrderItem {
   totalPrice: number;
 }
 
+// Form data structure for creating test orders
 interface TestOrderForm {
   clientId: string;
   clientCIN: string;
@@ -48,12 +54,24 @@ interface TestOrderForm {
 }
 
 export default function TestPage() {
+  // ========== STATE MANAGEMENT ==========
+  
+  // Available clients loaded from Firestore
   const [clients, setClients] = useState<Client[]>([]);
+  
+  // Available products loaded from Firestore
   const [products, setProducts] = useState<Product[]>([]);
+  
+  // Loading state for form submission
   const [loading, setLoading] = useState(false);
+  
+  // Loading state for initial data fetch
   const [loadingData, setLoadingData] = useState(true);
+  
+  // Success notification message displayed after order creation
   const [successMessage, setSuccessMessage] = useState("");
 
+  // Form data for creating a new test order
   const [formData, setFormData] = useState<TestOrderForm>({
     clientId: "",
     clientCIN: "",
@@ -63,7 +81,9 @@ export default function TestPage() {
     taxRate: 19,
   });
 
-  // Fetch clients and products
+  // ========== DATA FETCHING ==========
+  
+  // Load clients and products from Firestore on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -101,6 +121,12 @@ export default function TestPage() {
     fetchData();
   }, []);
 
+  // ========== EVENT HANDLERS ==========
+  
+  /**
+   * Update form when client is selected from dropdown
+   * Automatically fills CIN and name fields
+   */
   const handleClientChange = (clientId: string) => {
     const selectedClient = clients.find(c => c.id === clientId);
     if (selectedClient) {
@@ -113,6 +139,10 @@ export default function TestPage() {
     }
   };
 
+  /**
+   * Update order item fields and recalculate totals
+   * Handles product selection, quantity changes, and price calculations
+   */
   const handleItemChange = (index: number, field: string, value: any) => {
     const newItems = [...formData.items];
     if (field === "productId") {
@@ -135,6 +165,10 @@ export default function TestPage() {
     setFormData(prev => ({ ...prev, items: newItems }));
   };
 
+  /**
+   * Check product stock availability and return status message
+   * Returns warning for low/out of stock, success for available items
+   */
   const getStockStatus = (productId: string, requestedQty: number) => {
     const product = products.find(p => p.id === productId);
     if (!product) return null;
@@ -145,6 +179,7 @@ export default function TestPage() {
     return { message: `✓ In stock (${product.stock})`, color: 'text-green-600' };
   };
 
+  // Add new empty item row to order form
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
@@ -152,6 +187,7 @@ export default function TestPage() {
     }));
   };
 
+  // Remove item from order by index
   const removeItem = (index: number) => {
     setFormData(prev => ({
       ...prev,
@@ -159,14 +195,22 @@ export default function TestPage() {
     }));
   };
 
+  // ========== CALCULATIONS ==========
+  
+  // Calculate order subtotal from all items
   const calculateSubtotal = () => {
     return formData.items.reduce((sum, item) => sum + item.totalPrice, 0);
   };
 
+  // Calculate order totals: subtotal, tax, and final total
   const subtotal = calculateSubtotal();
   const taxAmount = subtotal * (formData.taxRate / 100);
   const totalAmount = subtotal + taxAmount;
 
+  /**
+   * Submit order form to Firestore
+   * Validates client selection, items, and stock availability before creating order
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.clientId || formData.items.length === 0) {
@@ -194,7 +238,7 @@ export default function TestPage() {
     });
 
     if (stockIssues.length > 0) {
-      alert('❌ Insufficient stock:\n\n' + stockIssues.join('\n'));
+      alert(' Insufficient stock:\n\n' + stockIssues.join('\n'));
       return;
     }
 
@@ -236,6 +280,9 @@ export default function TestPage() {
     }
   };
 
+  // ========== UI RENDERING ==========
+  
+  // Show loading spinner while fetching clients and products
   if (loadingData) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -249,6 +296,7 @@ export default function TestPage() {
     );
   }
 
+  // Main test order creation form
   return (
     <div className="container mx-auto p-6">
       <motion.div
@@ -266,6 +314,7 @@ export default function TestPage() {
         <p className="text-muted-foreground">Create test orders to populate your database for testing</p>
       </motion.div>
 
+      {/* Success notification banner */}
       {successMessage && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -277,7 +326,7 @@ export default function TestPage() {
       )}
 
       <form onSubmit={handleSubmit}>
-        {/* Client Selection */}
+        {/* Client Selection Section - Choose client and set order details */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Select Client</CardTitle>
@@ -325,7 +374,7 @@ export default function TestPage() {
           </CardContent>
         </Card>
 
-        {/* Order Items */}
+        {/* Order Items Section - Add products with quantities and pricing */}
         <Card className="mb-6">
           <CardHeader>
             <div className="flex justify-between items-center">
@@ -431,7 +480,7 @@ export default function TestPage() {
           </CardContent>
         </Card>
 
-        {/* Summary */}
+        {/* Order Summary Section - Display calculated totals */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Order Summary</CardTitle>

@@ -5,6 +5,9 @@ import { motion } from "framer-motion"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { hoverCard, hoverTransition } from "@/lib/motion"
 
+// Revenue overview line chart
+// Shows monthly revenue trend data
+
 const data = [
   { name: "Jan", revenue: 13000 },
   { name: "Feb", revenue: 15000 },

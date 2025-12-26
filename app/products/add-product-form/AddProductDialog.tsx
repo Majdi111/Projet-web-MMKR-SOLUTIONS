@@ -402,9 +402,6 @@ export default function AddProductDialog({
                     className="pl-10"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  💡 Tip: Enter the local image path from your project (e.g., /products/phone.jpg, /products/laptop.png)
-                </p>
               </motion.div>
             </div>
           </div>

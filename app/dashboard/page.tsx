@@ -20,7 +20,7 @@ import { hoverCard, hoverTransition } from "@/lib/motion"
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
 
-// Data
+// Sample revenue data for charts
 const revenueData = [
   { name: "Jan", revenue: 13000 },
   { name: "Feb", revenue: 15000 },
@@ -82,7 +82,7 @@ const defaultStatsData = [
   },
 ]
 
-// Animated Counter Component
+// Animated counter component with smooth number transitions
 function AnimatedCounter({ 
   value, 
   duration = 2 
@@ -118,8 +118,8 @@ function AnimatedCounter({
   return <span ref={displayRef}>0</span>
 }
 
-// Stats Card Component
-function StatsCard({ card, index }: { card: typeof statsData[0], index: number }) {
+// Statistics card with icon and trend indicator
+function StatsCard({ card, index }: { card: typeof defaultStatsData[0], index: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20, scale: 0.9 }}
@@ -461,6 +461,9 @@ function LoadingScreen() {
 
 
 export default function DashboardPage() {
+  // ========== STATE MANAGEMENT ==========
+  
+  // Dashboard statistics data (revenue, clients, invoices, products)
   const [statsData, setStatsData] = useState(defaultStatsData);
   const [loading, setLoading] = useState(() => {
     // Only show loading on first mount (after login)

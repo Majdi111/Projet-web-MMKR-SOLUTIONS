@@ -5,6 +5,9 @@ import { motion } from "framer-motion"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { hoverCard, hoverTransition } from "@/lib/motion"
 
+// Invoice status pie chart
+// Displays paid, pending, and overdue invoice counts
+
 const COLORS = ["#140aa0ff", "#fbbf24", "#d81919ff"]
 const data = [
   { name: "Paid", value: 68 },

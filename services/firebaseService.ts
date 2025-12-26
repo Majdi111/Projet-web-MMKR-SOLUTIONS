@@ -1,4 +1,5 @@
 // firebaseService.ts
+// Firebase database service functions for managing clients, orders, and invoices
 import { db } from "../lib/firebaseClient";
 import { Client, Order } from "../types/index";
 import { 
@@ -6,8 +7,10 @@ import {
 } from "firebase/firestore";
 import type { DocumentData } from "firebase/firestore";
 
-// --- Clients ---
-// Add a new client
+// ============ CLIENT SERVICES ============
+
+// Create a new client in the database
+// Returns the newly created client ID
 export async function addClient(client: Omit<Client, "id" | "createdAt" | "updatedAt">) {
   try {
     const docRef = await addDoc(collection(db, "clients"), {
@@ -22,7 +25,8 @@ export async function addClient(client: Omit<Client, "id" | "createdAt" | "updat
   }
 }
 
-// Get all clients
+// Fetch all clients from the database
+// Converts Firestore Timestamp objects to JavaScript Date objects
 export async function getClients(): Promise<Client[]> {
   const querySnapshot = await getDocs(collection(db, "clients"));
   return querySnapshot.docs.map(doc => ({
@@ -33,8 +37,10 @@ export async function getClients(): Promise<Client[]> {
   })) as Client[];
 }
 
-// --- Orders ---
-// Add a new order
+// ============ ORDER SERVICES ============
+
+// Create a new order in the database
+// Returns the newly created order ID
 export async function addOrder(order: Omit<Order, "id" | "createdAt" | "updatedAt">) {
   try {
     const docRef = await addDoc(collection(db, "orders"), {
@@ -49,6 +55,8 @@ export async function addOrder(order: Omit<Order, "id" | "createdAt" | "updatedA
   }
 }
 
+// Fetch all orders for a specific client
+// Handles both Timestamp and string date formats for compatibility
 export const getOrdersByClient = async (clientId: string): Promise<Order[]> => {
   const ordersRef = collection(db, "orders");
   const q = query(ordersRef, where("clientId", "==", clientId));
@@ -66,6 +74,9 @@ export const getOrdersByClient = async (clientId: string): Promise<Order[]> => {
     } as Order;
   });
 };
+
+// Update the status of an order
+// Automatically sets the updatedAt timestamp
 export const updateOrderStatus = async (orderId: string, newStatus: string) => {
   const orderRef = doc(db, "orders", orderId);
   await updateDoc(orderRef, {
@@ -74,7 +85,10 @@ export const updateOrderStatus = async (orderId: string, newStatus: string) => {
   });
 };
 
-// Create invoice record
+// ============ INVOICE SERVICES ============
+
+// Create a new invoice record in the database
+// Returns the newly created invoice ID
 export const createInvoice = async (invoiceData: DocumentData) => {
   const invoicesRef = collection(db, "invoices");
   const docRef = await addDoc(invoicesRef, {
@@ -84,7 +98,7 @@ export const createInvoice = async (invoiceData: DocumentData) => {
   return docRef.id;
 };
 
-// Get all invoices
+// Fetch all invoices from the database
 export const getInvoices = async () => {
   const invoicesRef = collection(db, "invoices");
   const querySnapshot = await getDocs(invoicesRef);
@@ -95,7 +109,7 @@ export const getInvoices = async () => {
   }));
 };
 
-// Get client by ID
+// Fetch a specific client by their ID
 export const getClientById = async (clientId: string) => {
   const clientRef = doc(db, "clients", clientId);
   const clientDoc = await getDoc(clientRef);
@@ -108,7 +122,7 @@ export const getClientById = async (clientId: string) => {
   };
 };
 
-// Delete invoice
+// Delete an invoice from the database
 export const deleteInvoice = async (invoiceId: string) => {
   const invoiceRef = doc(db, "invoices", invoiceId);
   await deleteDoc(invoiceRef);

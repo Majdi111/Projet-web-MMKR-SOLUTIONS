@@ -12,17 +12,29 @@ import { Building2, Globe, Save, Plus, Trash2, AlertCircle } from "lucide-react"
 import { hoverCard, hoverTransition } from "@/lib/motion";
 
 export default function SettingsPage() {
+  // ========== STATE MANAGEMENT ==========
+  
+  // Application language preference
   const [language, setLanguage] = useState("en");
+  
+  // Company profile information stored in localStorage
   const [companyName, setCompanyName] = useState("");
   const [companyEmail, setCompanyEmail] = useState("");
   const [phoneNumbers, setPhoneNumbers] = useState<string[]>([""]);
   const [addresses, setAddresses] = useState<string[]>([""]);
   const [companyDescription, setCompanyDescription] = useState("");
+  
+  // Form submission and validation states
   const [isSaving, setIsSaving] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  
+  // Prevents editing after profile is saved
   const [isLocked, setIsLocked] = useState(false);
 
+  // ========== DATA LOADING ==========
+  
+  // Load company profile from localStorage on component mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -50,6 +62,9 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ========== VALIDATION ==========
+  
+  // Validate phone numbers before saving
   const validatePhoneNumbers = (): boolean => {
     const nonEmptyPhones = phoneNumbers.filter(p => p.trim());
     for (const phone of nonEmptyPhones) {
@@ -63,6 +78,9 @@ export default function SettingsPage() {
     return true;
   };
 
+  // ========== EVENT HANDLERS ==========
+  
+  // Validate and open save confirmation dialog
   const handleSaveClick = () => {
     if (!validatePhoneNumbers()) {
       return;
@@ -70,6 +88,7 @@ export default function SettingsPage() {
     setSaveDialogOpen(true);
   };
 
+  // Save company profile to localStorage and lock form
   const handleConfirmSave = async () => {
     setIsSaving(true);
     try {

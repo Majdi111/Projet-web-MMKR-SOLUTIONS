@@ -20,6 +20,9 @@ import { logout } from "@/lib/auth";
 import Image from "next/image";
 import { hoverNavItem, tapNavItem, hoverTransition } from "@/lib/motion";
 
+// Navigation sidebar with collapsible menu
+// Contains main navigation links and logout functionality
+
 
 export default function Sidebar({
    isCollapsed,

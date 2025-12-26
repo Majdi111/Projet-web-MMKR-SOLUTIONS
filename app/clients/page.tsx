@@ -52,7 +52,9 @@ import {
 import { db } from '@/lib/firebaseClient';
 import { generateInvoicePDF } from "@/app/utils/generateInvoice";
 
+// ========== TYPE DEFINITIONS ==========
 
+// Client data structure with status and order count
 interface Client {
   id: string;
   cin: string;
@@ -66,14 +68,17 @@ interface Client {
   pendingOrdersCount?: number;
 }
 
+// Individual item in an order with pricing details
 interface OrderItem {
   id: string;
+  productId ?:string;
   description: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
 }
 
+// Order data structure with status tracking and invoice reference
 interface Order {
   id: string;
   clientId: string;
@@ -91,6 +96,7 @@ interface Order {
   invoiceId?: string;
 }
 
+// Invoice data structure with complete client and order details
 interface Invoice {
   id?: string;
   invoiceNumber: string;
@@ -116,7 +122,9 @@ interface Invoice {
   updatedAt: Date;
 }
 
-//  AUTOMATIC CALCULATION FUNCTION
+// ========== UTILITY FUNCTIONS ==========
+
+// Calculate invoice totals with tax from line items
 const calculateInvoiceTotals = (
   items: OrderItem[],
   taxRate: number = 0.2
@@ -135,6 +143,7 @@ const calculateInvoiceTotals = (
   };
 };
 
+// Generate unique invoice number with timestamp and random suffix
 const generateInvoiceNumber = () => {
   const timestamp = Date.now().toString().slice(-8);
   const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
@@ -142,33 +151,65 @@ const generateInvoiceNumber = () => {
 };
 
 export default function ClientsPage() {
+  // ========== STATE MANAGEMENT ==========
   
+  // All clients with pending order counts
   const [clients, setClients] = useState<Client[]>([]);
+  
+  // Loading state while fetching data
   const [loading, setLoading] = useState(false);
+  
+  // Display mode: grid or table view
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  
+  // Current filter selection for client status
   const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Inactive" | "PendingOrders">("All");
+  
+  // Search query for filtering clients by name/CIN/email/phone/location
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Currently selected client for viewing orders
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  
+  // Orders belonging to selected client
   const [clientOrders, setClientOrders] = useState<Order[]>([]);
+  
+  // Currently selected order for detail view
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  
+  // Track which order is being processed (converted to invoice)
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
+  
+  // Add client dialog visibility
   const [showAddClientDialog, setShowAddClientDialog] = useState(false);
+  
+  // Notification toast for success/error messages
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  
+  // Delete confirmation dialog state
   const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; clientId: string; clientName: string }>({
     isOpen: false,
     clientId: "",
     clientName: "",
   });
+  
+  // Track which client is being deleted (shows loading spinner)
   const [deletingClientId, setDeletingClientId] = useState<string | null>(null); 
   
+  // ========== EVENT HANDLERS ==========
+  
+  // Open add client dialog
   const handleOpenAddClient = () => setShowAddClientDialog(true);
+  
+  // Close add client dialog
   const handleCloseAddClient = () => setShowAddClientDialog(false);
   
+  // Reload clients list after adding new client
   const handleClientAdded = async () => {
     await loadClients();
   };
 
+  // Open delete confirmation dialog
   const handleDeleteClient = (clientId: string, clientName: string) => {
     setDeleteDialogState({
       isOpen: true,
@@ -177,6 +218,7 @@ export default function ClientsPage() {
     });
   };
 
+  // Execute client deletion after confirmation
   const confirmDeleteClient = async () => {
     try {
       setDeletingClientId(deleteDialogState.clientId);
@@ -201,7 +243,7 @@ export default function ClientsPage() {
     }
   };
 
-  // Load clients WITH pending order counts
+  // Fetch all clients with their pending order counts
   const loadClients = async () => {
     try {
       setLoading(true);
@@ -245,6 +287,7 @@ export default function ClientsPage() {
     loadClients();
   }, []);
 
+  // Load orders for selected client
   const handleClientClick = async (client: Client) => {
     setSelectedClient(client);
     setClientOrders([]);
@@ -283,6 +326,7 @@ export default function ClientsPage() {
     }
   };
 
+  // Process pending order: create invoice, update stock, generate PDF
   const handleTraiterOrder = async (order: Order) => {
     if (!selectedClient) return;
 
@@ -293,7 +337,7 @@ export default function ClientsPage() {
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 30);
 
-      // Use the tax values directly from the order, not recalculating
+      // Use order's existing tax values to avoid recalculation
       const taxRate = order.taxRate ?? 0;
       const taxAmount = order.taxAmount ?? 0;
       const subtotal = order.subtotal ?? 0;
@@ -342,7 +386,7 @@ export default function ClientsPage() {
         updatedAt: serverTimestamp(),
       });
 
-      // Update product stock quantities and sales count
+      // Decrease stock and increment sales for each product
       const productUpdatePromises = order.items.map(async (item) => {
         if (item.productId) {
           try {
@@ -355,7 +399,7 @@ export default function ClientsPage() {
               const currentSales = productSnap.data().sales || 0;
               const newSales = currentSales + item.quantity;
               
-              // Determine new status based on stock level
+              // Auto-update product status based on new stock level
               let newStatus = productSnap.data().status;
               if (newStock <= 0) {
                 newStatus = "Out of Stock";
@@ -377,13 +421,14 @@ export default function ClientsPage() {
       });
       await Promise.all(productUpdatePromises);
 
+      // Generate and download PDF invoice
       await generateInvoicePDF({ ...invoiceData, id: invoiceDoc.id });
       await handleClientClick(selectedClient);
-      await loadClients(); // Refresh pending counts
+      await loadClients();
 
       setNotification({
         type: "success",
-        message: `✅ Invoice ${invoiceData.invoiceNumber} created & PDF downloaded!`
+        message: ` Invoice ${invoiceData.invoiceNumber} created & PDF downloaded!`
       });
       setTimeout(() => setNotification(null), 5000);
     } catch (err) {
@@ -391,7 +436,7 @@ export default function ClientsPage() {
       const errorMessage = err instanceof Error ? err.message : "Failed to process order";
       setNotification({
         type: "error",
-        message: `❌ ${errorMessage}`
+        message: ` ${errorMessage}`
       });
       setTimeout(() => setNotification(null), 5000);
     } finally {

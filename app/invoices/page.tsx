@@ -72,24 +72,47 @@ interface Invoice {
 }
 
 export default function InvoicesPage() {
+  // ========== STATE MANAGEMENT ==========
+  
+  // All invoices loaded from Firestore
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  
+  // Loading state while fetching invoices
   const [loading, setLoading] = useState(true);
+  
+  // Error message from failed operations
   const [error, setError] = useState<string | null>(null);
+  
+  // Track which invoice is being downloaded (shows loading spinner)
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  
+  // Track which invoice status is being updated
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  
+  // Delete confirmation dialog state
   const [deleteDialogState, setDeleteDialogState] = useState<{ isOpen: boolean; invoiceId: string; invoiceNumber: string }>({
     isOpen: false,
     invoiceId: "",
     invoiceNumber: "",
   });
+  
+  // Display mode: grid or table view
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  
+  // Current filter selection for invoice status
   const [statusFilter, setStatusFilter] = useState<"All" | "Paid" | "Pending" | "Overdue">("All");
-  const [cinSearch, setCinSearch] = useState(""); // ✅ NEW: CIN Search State
+  
+  // Search query for filtering invoices by client CIN
+  const [cinSearch, setCinSearch] = useState("");
 
+  // ========== DATA FETCHING ==========
+  
+  // Load invoices on component mount
   useEffect(() => {
     loadInvoices();
   }, []);
 
+  // Fetch all invoices from Firestore
   const loadInvoices = async () => {
     setLoading(true);
     setError(null);
@@ -120,6 +143,7 @@ export default function InvoicesPage() {
     }
   };
 
+  // Update invoice status in Firestore
   const handleUpdateStatus = async (invoiceId: string, newStatus: Invoice["status"]) => {
     setUpdatingStatusId(invoiceId);
     
@@ -145,7 +169,7 @@ export default function InvoicesPage() {
     }
   };
 
-  //filter
+  // Filter invoices by status and CIN search
   const filteredInvoices = invoices
     .filter(inv => statusFilter === "All" || inv.status === statusFilter)
     .filter(inv => 
@@ -159,6 +183,7 @@ export default function InvoicesPage() {
     .filter(i => i.status === "Paid")
     .reduce((sum, i) => sum + i.totalAmount, 0);
 
+  // Generate and download PDF for invoice
   const handleDownloadPDF = async (invoice: Invoice) => {
     setDownloadingId(invoice.id);
     try {
@@ -171,6 +196,7 @@ export default function InvoicesPage() {
     }
   };
 
+  // Open delete confirmation dialog
   const handleDeleteInvoice = (invoiceId: string, invoiceNumber: string) => {
     setDeleteDialogState({
       isOpen: true,
@@ -179,6 +205,7 @@ export default function InvoicesPage() {
     });
   };
 
+  // Execute invoice deletion after confirmation
   const confirmDeleteInvoice = async () => {
     try {
       await deleteDoc(doc(db, 'invoices', deleteDialogState.invoiceId));
@@ -424,10 +451,6 @@ export default function InvoicesPage() {
                         <DropdownMenuItem onClick={() => handleDownloadPDF(inv)}>
                           <Download className="mr-2 h-4 w-4" />
                           Download PDF
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Invoice
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           className="text-destructive"

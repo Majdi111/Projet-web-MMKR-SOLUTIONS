@@ -11,6 +11,9 @@ import { db } from '@/lib/firebaseClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 
+// Top navigation bar with search, notifications, and theme toggle
+// Displays pending orders and provides quick access to settings
+
 interface PendingOrder {
   id: string;
   orderNumber: string;

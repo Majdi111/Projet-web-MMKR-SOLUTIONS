@@ -7,6 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { motion } from "framer-motion";
 import { hoverTransition } from "@/lib/motion";
 
+// Delete confirmation dialog component
+// Shows warning and requires user confirmation before deleting items
+
 interface DeleteConfirmDialogProps {
   isOpen: boolean;
   itemName: string;

@@ -3,6 +3,9 @@
 import { useEffect, useMemo } from "react"
 import { usePathname } from "next/navigation"
 
+// Updates browser tab title based on current page
+// Converts pathname to readable page name
+
 function titleFromPathname(pathname: string): string {
   if (pathname === "/") return "Home"
 
